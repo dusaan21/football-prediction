@@ -75,7 +75,34 @@ def train_and_predict_snn(home_columns, away_columns, training_data, test_data, 
     predicted_home = np.maximum(predicted_home, 0)
     predicted_away = np.maximum(predicted_away, 0)
 
-    return predicted_home.flatten(), predicted_away.flatten()
+    return predicted_home.flatten(), predicted_away.flatten(), sm
+
+def predict_goals_and_fouls(home_team, away_team, home_columns, away_columns, model_goals, model_fouls, data):
+    home_team_label = team_mapping.get(home_team, -1)
+    away_team_label = team_mapping.get(away_team, -1)
+
+    if home_team_label == -1 or away_team_label == -1:
+        print("Please enter valid team names.")
+        return None, None, None, None
+    
+    input_home = data.loc[(data['HomeTeam'] == home_team_label) & (data["AwayTeam"] == away_team_label)][home_columns]
+    input_away = data.loc[(data['HomeTeam'] == home_team_label) & (data["AwayTeam"] == away_team_label)][away_columns]
+        
+    predicted_home_goals, predicted_away_goals = model_goals.predict([input_home, input_away])
+    predicted_home_fouls, predicted_away_fouls = model_fouls.predict([input_home, input_away])
+    
+    predicted_home_goals = predicted_home_goals.round().astype(int)
+    predicted_away_goals = predicted_away_goals.round().astype(int)
+    predicted_home_fouls = predicted_home_fouls.round().astype(int)
+    predicted_away_fouls = predicted_away_fouls.round().astype(int)
+
+
+    predicted_home_goals = np.maximum(predicted_home_goals, 0)
+    predicted_away_goals = np.maximum(predicted_away_goals, 0)
+    predicted_home_fouls = np.maximum(predicted_home_fouls, 0)
+    predicted_away_fouls = np.maximum(predicted_away_fouls, 0)
+    
+    return predicted_home_goals.flatten()[0], predicted_away_goals.flatten()[0], predicted_home_fouls.flatten()[0], predicted_away_fouls.flatten()[0]
 
 #Ucitavamo podatke
 ds1 = pd.read_csv(r"Datasets\Season1.csv")
@@ -111,8 +138,8 @@ test_data = dataset[dataset['Date'] > '08/01/2021']
 home_columns=['HomeTeam', 'HTHG', 'HS', 'HST', 'HC', 'Home_SOT_Perc', 'HY', 'HR']
 away_columns=['AwayTeam', 'HTAG', 'AS', 'AST', 'AC', 'Away_SOT_Perc', 'AY', 'AR']
 
-predicted_home_goals, predicted_away_goals = train_and_predict_snn(home_columns, away_columns, training_data, test_data, ['FTHG', 'FTAG'])
-predicted_home_fouls, predicted_away_fouls = train_and_predict_snn(home_columns, away_columns, training_data, test_data, ['HF', 'AF'])
+predicted_home_goals, predicted_away_goals, sm_goals = train_and_predict_snn(home_columns, away_columns, training_data, test_data, ['FTHG', 'FTAG'])
+predicted_home_fouls, predicted_away_fouls, sm_fouls = train_and_predict_snn(home_columns, away_columns, training_data, test_data, ['HF', 'AF'])
 
 
 test_output_home_goals = test_data['FTHG'].values.ravel()
@@ -144,3 +171,31 @@ print("Crosstab for Away Team Fouls: ")
 print(pd.crosstab(index = combined["actual"], columns=combined["prediction"]))
 accuracy = (abs(predicted_away_fouls.flatten() - test_output_away_fouls) <= 2).mean()
 print("Precision Accuracy for Away Team Fouls:", accuracy)
+
+
+while True:
+    print("***************************************")
+    home_team = input("Enter home team: ")
+    if home_team == "x":
+        break
+    away_team = input("Enter away team: ")
+    
+    predicted_home_goals, predicted_away_goals, predicted_home_fouls, predicted_away_fouls = predict_goals_and_fouls(home_team, away_team, home_columns, away_columns, sm_goals, sm_fouls, test_data)
+    if predicted_home_goals is not None and predicted_away_goals is not None and predicted_home_fouls is not None and predicted_away_fouls is not None:
+        
+        actual_values = test_data.loc[(test_data['HomeTeam'] == team_mapping.get(home_team)) & (test_data['AwayTeam'] == team_mapping.get(away_team))]
+
+        print("-Predicted goals-")
+        print(f"{home_team} {predicted_home_goals} - {predicted_away_goals} {away_team}")
+        print("-Actual goals-")
+        print(f"{home_team} {actual_values['FTHG'].values[0]} - {actual_values['FTAG'].values[0]} {away_team}")
+        
+        print("-Predicted fouls-")
+        print(f"{home_team} {predicted_home_fouls} - {predicted_away_fouls} {away_team}")
+        print("-Actual fouls-")
+        print(f"{home_team} {actual_values['HF'].values[0]} - {actual_values['AF'].values[0]} {away_team}")
+        
+        
+        
+    else:
+        print("Failed to get predictions.")
