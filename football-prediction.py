@@ -29,6 +29,9 @@ dataset["Hour"] = dataset["Time"].str.replace(":.+", "", regex=True).astype("int
 dataset["Day_Code"] = dataset["Date"].dt.dayofweek
 dataset = dataset.drop(["Time"], axis=1)
 
+#formiramo dodatne kolone koje ce nam dodatno optimizovati mrezu
+dataset['Home_SOT_Perc'] = dataset['HST']/dataset['HS']
+dataset['Away_SOT_Perc'] = dataset['AST']/dataset['AS']
 
 
 #Mapiramo Timove na indekse, da bi mogli da ih koristimo u NM
@@ -44,8 +47,8 @@ training_data = dataset[dataset['Date'] < '08/01/2021']
 test_data = dataset[dataset['Date'] > '08/01/2021']
 
 #Delimo ulazne kolone na dva dela, jer cemo koristiti Sijamsku NM, gde ce nam jedna podmreza biti za domacu ekipu, a druga za gostujucu
-home_columns=['Hour','Day_Code', 'HomeTeam', 'HTHG', 'HS', 'HST', 'HC']
-away_columns=['Hour','Day_Code', 'AwayTeam', 'HTAG', 'AS', 'AST', 'AC']
+home_columns=['Hour','Day_Code', 'HomeTeam', 'HTHG', 'HS', 'HST', 'HC', 'Home_SOT_Perc']
+away_columns=['Hour','Day_Code', 'AwayTeam', 'HTAG', 'AS', 'AST', 'AC', 'Home_SOT_Perc']
 training_input_home = training_data[home_columns]
 training_input_away = training_data[away_columns]
 training_output_home = training_data['FTHG']
@@ -73,8 +76,6 @@ hidden_away2 = layers.Dense(hidden_units/2, activation='LeakyReLU', kernel_regul
 hidden_away3 = layers.Dense(hidden_units/4, activation='LeakyReLU', kernel_regularizer=regularizers.l2(l2_strength))(hidden_away2)
 hidden_away4 = layers.Dense(hidden_units/8, activation='LeakyReLU', kernel_regularizer=regularizers.l2(l2_strength))(hidden_away3)
 hidden_away5 = layers.Dense(1, activation='linear', kernel_regularizer=regularizers.l2(l2_strength))(hidden_away4)
-
-
 
 #Koristimo sloj Concatenate da bi spojili izlaze iz prethodne dve podmreze
 concatenated = layers.Concatenate()([hidden_home5, hidden_away5])
